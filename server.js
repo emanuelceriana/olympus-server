@@ -3,6 +3,7 @@ const http = require("http");
 const { Server } = require("socket.io");
 const { shuffle } = require("./utils");
 const { cards, deckIndex } = require("./constants");
+const { handle } = require("express/lib/application");
 
 const app = express();
 const server = http.createServer(app);
@@ -30,9 +31,10 @@ function startTurn(socketId) {
   if (game.deck.length > 0) {
     const drawnCard = game.deck.pop();
     game.hands[currentSocket.id].push(drawnCard);
-    currentSocket.emit("drawn-card", { cardId: drawnCard });
+    currentSocket.emit("drawn-card", { cardId: drawnCard, deck: game.deck });
     opponentSocket.emit("oponent-hand-updated", {
       hand: game.hands[currentSocket.id],
+      deck: game.deck,
     });
   }
 
@@ -79,7 +81,7 @@ io.on("connection", (socket) => {
   games.set(player2.id, player1);
 
   const shuffledDeck = shuffle([...deckIndex]);
-  const discarded = shuffledDeck.pop();
+  const discarded = [shuffledDeck.pop()];
   const player1Hand = shuffledDeck.splice(0, 6);
   const player2Hand = shuffledDeck.splice(0, 6);
 
@@ -94,6 +96,18 @@ io.on("connection", (socket) => {
       [player1.id]: player1Hand,
       [player2.id]: player2Hand,
     },
+    actions: {
+      [player1.id]: [1, 2, 3, 4],
+      [player2.id]: [1, 2, 3, 4],
+    },
+    scoredCards: {
+      [player1.id]: [],
+      [player2.id]: [],
+    },
+    secretCard: {
+      [player1.id]: null,
+      [player2.id]: null,
+    },
     currentTurn: player1.id,
   };
 
@@ -105,6 +119,12 @@ io.on("connection", (socket) => {
     hand: player1Hand,
     opponentHand: player2Hand,
     discarded,
+    deck: shuffledDeck,
+    availableActions: [1, 2, 3, 4],
+    opponentAvailableActions: [1, 2, 3, 4],
+    secretCard: null,
+    scoredCards: [],
+    opponentScoredCards: [],
     config: { allCards: cards },
   });
 
@@ -113,6 +133,12 @@ io.on("connection", (socket) => {
     hand: player2Hand,
     opponentHand: player1Hand,
     discarded,
+    deck: shuffledDeck,
+    availableActions: [1, 2, 3, 4],
+    opponentAvailableActions: [1, 2, 3, 4],
+    secretCard: null,
+    scoredCards: [],
+    opponentScoredCards: [],
     config: { allCards: cards },
   });
 
@@ -132,10 +158,101 @@ io.on("connection", (socket) => {
     });
   };
 
+  const handleGiftAction = (player) => {
+    player.on("trigger-gift-action", ({ pickedCards }) => {
+      const opponent = findOpponent(player);
+      opponent.emit("resolve-gift-action", {
+        pickedCards,
+      });
+    });
+  };
+
+  const handleEndGiftAction = (player) => {
+    player.on("end-gift-action", ({ cardsToPick, pickedCard }) => {
+      const opponent = findOpponent(player);
+
+      const game = gameStates.get(opponent.id);
+      if (!game) return;
+
+      game.hands[opponent.id] = game.hands[opponent.id].filter(
+        (carId) => !cardsToPick.find((c) => c.id === carId)
+      );
+
+      game.actions[opponent.id] = game.actions[opponent.id].filter(
+        (action) => action !== 3
+      );
+
+      game.scoredCards[player.id] = [
+        ...gameStates.get(player.id).scoredCards[player.id],
+        pickedCard,
+      ];
+
+      game.scoredCards[opponent.id] = [
+        ...gameStates.get(opponent.id).scoredCards[opponent.id],
+        ...cardsToPick.filter((card) => card.id !== pickedCard.id),
+      ];
+
+      opponent.emit("gift-action-clean-up", {
+        hand: game.hands[opponent.id],
+        opponentHand: gameStates.get(player.id).hands[player.id],
+        availableActions: game.actions[opponent.id],
+        opponentAvailableActions: gameStates.get(player.id).actions[player.id],
+        scoredCards: game.scoredCards[opponent.id],
+        opponentScoredCards: game.scoredCards[player.id],
+      });
+
+      player.emit("gift-action-clean-up", {
+        hand: gameStates.get(player.id).hands[player.id],
+        opponentHand: game.hands[opponent.id],
+        availableActions: gameStates.get(player.id).actions[player.id],
+        opponentAvailableActions: game.actions[opponent.id],
+        scoredCards: game.scoredCards[player.id],
+        opponentScoredCards: game.scoredCards[opponent.id],
+      });
+
+      endTurn(opponent.id);
+    });
+  };
+
+  const handleSecretAction = (player) => {
+    player.on("trigger-secret-action", ({ pickedCard }) => {
+      const opponent = findOpponent(player);
+
+      const game = gameStates.get(player.id);
+      if (!game) return;
+
+      game.hands[player.id] = game.hands[player.id].filter(
+        (cardId) => cardId !== pickedCard.id
+      );
+
+      game.actions[player.id] = game.actions[player.id].filter(
+        (action) => action !== 1
+      );
+
+      player.emit("secret-action-clean-up", {
+        hand: game.hands[player.id],
+        availableActions: game.actions[player.id],
+        secretCard: pickedCard,
+      });
+
+      opponent.emit("update-opponent-available-actions", {
+        opponentAvailableActions: game.actions[player.id],
+      });
+
+      endTurn(player.id);
+    });
+  };
+
   handleHover(player1);
   handleHover(player2);
   handleEndTurn(player1);
   handleEndTurn(player2);
+  handleGiftAction(player1);
+  handleGiftAction(player2);
+  handleEndGiftAction(player1);
+  handleEndGiftAction(player2);
+  handleSecretAction(player1);
+  handleSecretAction(player2);
 
   const handleDisconnect = (player, label) => {
     console.log(`${label} disconnected`, player.id);
