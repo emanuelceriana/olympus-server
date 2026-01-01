@@ -21,6 +21,19 @@ function findOpponent(socket) {
   return games.get(socket.id) || null;
 }
 
+function notifyOpponentHandUpdate(socket, game) {
+    const opponent = findOpponent(socket);
+    if (!opponent) return;
+    
+    // Notify opponent about MY hand (which is opponentHand for them)
+    // The event 'oponent-hand-updated' expects { hand, deck }
+    // Sending game.hands[socket.id]
+    opponent.emit("oponent-hand-updated", {
+        hand: game.hands[socket.id],
+        deck: game.deck
+    });
+}
+
 function startTurn(socketId) {
   const game = gameStates.get(socketId);
   if (!game) return;
@@ -183,16 +196,14 @@ function startNewRound(game) {
    game.scoredCards[p1Id] = [];
    game.scoredCards[p2Id] = [];
    game.secretCard[p1Id] = null;
-   game.secretCard[p2Id] = null;
-   // Switch start player?
-   const ids = Object.keys(game.players);
-   game.currentTurn = ids.find(id => id !== game.currentTurn) || ids[0]; // Simple toggle logic might fail if ids order is unstable, but map keys usually insertion order.
-   // Better: Toggle based on previous round starter? For now just toggle currentTurn.
+   game.playerDiscards[p1Id] = [];
+   game.playerDiscards[p2Id] = [];
    
    game.players[p1Id].emit("new-round", {
      hand: p1Hand,
      opponentHand: p2Hand, // sizes only?
      discarded,
+     myDiscarded: [],
      deck: shuffledDeck, // sizes
      availableActions: [1,2,3,4],
      opponentAvailableActions: [1,2,3,4],
@@ -203,6 +214,7 @@ function startNewRound(game) {
      hand: p2Hand,
      opponentHand: p1Hand,
      discarded,
+     myDiscarded: [],
      deck: shuffledDeck,
      availableActions: [1,2,3,4],
      opponentAvailableActions: [1,2,3,4],
@@ -265,6 +277,10 @@ io.on("connection", (socket) => {
       [player1.id]: null,
       [player2.id]: null,
     },
+    playerDiscards: {
+      [player1.id]: [],
+      [player2.id]: [],
+    },
     currentTurn: player1.id,
     favors: {}, // color -> playerId
   };
@@ -277,6 +293,7 @@ io.on("connection", (socket) => {
     hand: player1Hand,
     opponentHand: player2Hand,
     discarded,
+    myDiscarded: [],
     deck: shuffledDeck,
     availableActions: [1, 2, 3, 4],
     opponentAvailableActions: [1, 2, 3, 4],
@@ -291,6 +308,7 @@ io.on("connection", (socket) => {
     hand: player2Hand,
     opponentHand: player1Hand,
     discarded,
+    myDiscarded: [],
     deck: shuffledDeck,
     availableActions: [1, 2, 3, 4],
     opponentAvailableActions: [1, 2, 3, 4],
@@ -397,6 +415,8 @@ io.on("connection", (socket) => {
         opponentAvailableActions: game.actions[player.id],
       });
 
+      notifyOpponentHandUpdate(player, game); // Fix: Update opponent about my new hand size
+
       endTurn(player.id);
     });
   };
@@ -432,10 +452,16 @@ io.on("connection", (socket) => {
         ...pickedCards.map((c) => c.id),
       ];
 
+      game.playerDiscards[player.id] = [
+        ...game.playerDiscards[player.id],
+        ...pickedCards.map((c) => c.id),
+      ];
+
       player.emit("discard-action-clean-up", {
         hand: game.hands[player.id],
         availableActions: game.actions[player.id],
         discarded: game.discarded,
+        myDiscarded: game.playerDiscards[player.id],
       });
 
       opponent.emit("update-opponent-available-actions", {
@@ -446,6 +472,8 @@ io.on("connection", (socket) => {
        opponent.emit("update-discarded", {
         discarded: game.discarded,
       });
+
+      notifyOpponentHandUpdate(player, game); // Fix: Update opponent about my new hand size
 
       endTurn(player.id);
     });
