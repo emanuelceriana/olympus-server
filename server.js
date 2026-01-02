@@ -156,14 +156,19 @@ function checkEndRound(game) {
     }
 
     // Send updated favors to clients
+    // Send updated favors to clients
     Object.values(game.players).forEach(player => {
+        const opponent = findOpponent(player);
         player.emit("round-end", {
             favors: game.favors,
-            scoredCards: game.scoredCards, // Render all cards for review?
+            scoredCards: game.scoredCards[player.id], 
+            opponentScoredCards: game.scoredCards[opponent.id],
+            isGameOver: !!winner // Tell client if this is the final round
         });
     });
 
     if (winner) {
+        // Emit game-over immediately - client handles delay
         io.emit("game-over", { winner });
         games.delete(p1Id);
         games.delete(p2Id); 
@@ -171,7 +176,7 @@ function checkEndRound(game) {
         gameStates.delete(p2Id);
     } else {
         // Start New Round
-        setTimeout(() => startNewRound(game), 5000); // 5s delay to see results
+        setTimeout(() => startNewRound(game), 3000); // 3s delay to see results
     }
   }
 }
@@ -230,7 +235,7 @@ io.on("connection", (socket) => {
 
   if (!waitingPlayer) {
     waitingPlayer = socket;
-    socket.emit("waiting", { message: "Esperando oponente..." });
+    socket.emit("waiting", { message: "Waiting for opponent..." });
 
     socket.on("disconnect", () => {
       console.log("User disconnected (was waiting)", socket.id);
