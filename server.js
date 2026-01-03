@@ -104,13 +104,13 @@ function checkEndRound(game) {
 
     // 2. Calculate Favors
     const cardTypes = [
-      { color: "pink", value: 2 },
-      { color: "yellow", value: 2 },
-      { color: "lightblue", value: 2 },
-      { color: "blue", value: 3 },
-      { color: "red", value: 3 },
-      { color: "green", value: 4 },
-      { color: "purple", value: 5 },
+      { color: "pink", value: 2 },      // Afrodita
+      { color: "lightblue", value: 2 }, // Artemisa
+      { color: "green", value: 2 },     // Dionisio
+      { color: "red", value: 3 },       // Ares
+      { color: "gold", value: 3 },      // Atenea
+      { color: "purple", value: 4 },    // Hades
+      { color: "yellow", value: 5 },    // Zeus
     ];
 
     cardTypes.forEach((type) => {
@@ -152,23 +152,32 @@ function checkEndRound(game) {
     console.log(`P2: ${p2Stats.favorCount} favors, ${p2Stats.pointsCount} points`);
 
     let winner = null;
-    // Standard rule: 11 points OR 4 favors.
-    // Prioritize 11 points if both meet? Or just simultaneous?
-    // Rule: "If one player collects 4 geishas and the other 11 points, the player with 11 points wins."
-    const p1WinFavors = p1Stats.favorCount >= 4;
-    const p1WinPoints = p1Stats.pointsCount >= 11;
-    const p2WinFavors = p2Stats.favorCount >= 4;
-    const p2WinPoints = p2Stats.pointsCount >= 11;
 
-    if ((p1WinPoints && !p2WinPoints) || (p1WinFavors && !p2WinPoints && !p2WinFavors)) {
+    // WIN CONDITIONS:
+    // 1. 11 or more points (Primary check per user request)
+    // 2. 4 or more Geishas (Gods)
+    
+    // Check points first as it overrides favors usually, or is equal.
+    const p1PointsWin = p1Stats.pointsCount >= 11;
+    const p2PointsWin = p2Stats.pointsCount >= 11;
+    const p1FavorsWin = p1Stats.favorCount >= 4;
+    const p2FavorsWin = p2Stats.favorCount >= 4;
+
+    if (p1PointsWin && p2PointsWin) {
+         // Tie-breaker: Higher points?
+         if (p1Stats.pointsCount > p2Stats.pointsCount) winner = p1Id;
+         else if (p2Stats.pointsCount > p1Stats.pointsCount) winner = p2Id;
+         // If points equal, no winner (play another round)
+    } else if (p1PointsWin) {
         winner = p1Id;
-    } else if ((p2WinPoints && !p1WinPoints) || (p2WinFavors && !p1WinPoints && !p1WinFavors)) {
+    } else if (p2PointsWin) {
         winner = p2Id;
-    } else if (p1WinPoints && p2WinPoints) {
-       // Both > 11 points? Tie? Or higher points? Standard says 11 points wins over 4 geishas.
-       // What if both have 11 points? Usually tie/continue.
-       if (p1Stats.pointsCount > p2Stats.pointsCount) winner = p1Id;
-       else if (p2Stats.pointsCount > p1Stats.pointsCount) winner = p2Id;
+    } else if (p1FavorsWin && p2FavorsWin) {
+        // Both have 4 favors? unlikely but possible. Tie.
+    } else if (p1FavorsWin) {
+        winner = p1Id;
+    } else if (p2FavorsWin) {
+        winner = p2Id;
     }
 
     // Send updated favors to clients
