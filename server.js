@@ -75,6 +75,7 @@ function endTurn(socketId) {
   const ids = Object.keys(game.players);
   const currentIndex = ids.indexOf(game.currentTurn);
   const nextIndex = (currentIndex + 1) % ids.length;
+  console.log(`[END TURN] Current: ${game.currentTurn}. Next: ${ids[nextIndex]}`);
   game.currentTurn = ids[nextIndex];
 
   startTurn(ids[nextIndex]);
@@ -84,6 +85,8 @@ function endTurn(socketId) {
 function checkEndRound(game) {
   const p1Id = Object.keys(game.players)[0];
   const p2Id = Object.keys(game.players)[1];
+
+  console.log(`[CHECK END ROUND] P1 Actions: ${game.actions[p1Id].length}, P2 Actions: ${game.actions[p2Id].length}`);
 
   // Check if both players have used all actions
   if (game.actions[p1Id].length === 0 && game.actions[p2Id].length === 0) {
@@ -111,11 +114,12 @@ function checkEndRound(game) {
     ];
 
     cardTypes.forEach((type) => {
+      // Robust filter: ensure 'c' exists and has 'color'
       const p1Count = game.scoredCards[p1Id].filter(
-        (c) => c.color === type.color
+        (c) => c && c.color === type.color
       ).length;
       const p2Count = game.scoredCards[p2Id].filter(
-        (c) => c.color === type.color
+        (c) => c && c.color === type.color
       ).length;
 
       if (p1Count > p2Count) {
@@ -123,7 +127,7 @@ function checkEndRound(game) {
       } else if (p2Count > p1Count) {
         game.favors[type.color] = p2Id;
       }
-      // If tie, favor remains unchanged (null or previous owner)
+      // If tie, favor remains unchanged
     });
 
     // 3. Check Win Condition
@@ -467,8 +471,9 @@ io.on("connection", (socket) => {
         const game = gameStates.get(opponent.id);
         if (!game) return;
 
+        // FIX: carId is actually a card object
         game.hands[opponent.id] = game.hands[opponent.id].filter(
-          (carId) => !cardsToPick.find((c) => c.id === carId)
+          (cardInHand) => !cardsToPick.find((c) => c.id === cardInHand.id)
         );
 
         game.actions[opponent.id] = game.actions[opponent.id].filter(
@@ -607,13 +612,17 @@ io.on("connection", (socket) => {
         const rejectedSet = pickedCards[chosenSetIndex === 0 ? 1 : 0];
 
         const allFourCards = [...pickedCards[0], ...pickedCards[1]];
+        
+        // FIX: cardId is actually a card object
         game.hands[opponent.id] = game.hands[opponent.id].filter(
-          (cardId) => !allFourCards.find((c) => c.id === cardId)
+          (cardInHand) => !allFourCards.find((c) => c.id === cardInHand.id)
         );
 
         game.actions[opponent.id] = game.actions[opponent.id].filter(
           (action) => action !== 4
         );
+
+        console.log(`[COMPETITION END] P${player.id===game.players[player.id].id?2:1} resolved. P${opponent.id} actions left: ${game.actions[opponent.id]}`);
 
         game.scoredCards[player.id] = [
           ...gameStates.get(player.id).scoredCards[player.id],
