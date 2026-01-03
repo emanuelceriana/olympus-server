@@ -13,6 +13,11 @@ const io = new Server(server, {
 
 const PORT = process.env.PORT || 3001;
 
+// Health Check Endpoint
+app.get('/health', (req, res) => {
+  res.status(200).send('OK');
+});
+
 // Room-based matchmaking
 const rooms = new Map(); // roomId -> { id, name, host, guest, gameState, createdAt }
 const playerRooms = new Map(); // socket.id -> roomId
