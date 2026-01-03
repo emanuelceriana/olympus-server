@@ -522,6 +522,9 @@ io.on("connection", (socket) => {
           (action) => action !== 1
         );
 
+        // Save secret card to game state for end of round
+        game.secretCard[player.id] = pickedCard;
+
         player.emit("secret-action-clean-up", {
           hand: game.hands[player.id],
           availableActions: game.actions[player.id],
