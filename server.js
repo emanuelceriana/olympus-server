@@ -480,9 +480,8 @@ io.on("connection", (socket) => {
         const game = gameStates.get(opponent.id);
         if (!game) return;
 
-        // FIX: carId is actually a card object
         game.hands[opponent.id] = game.hands[opponent.id].filter(
-          (cardInHand) => !cardsToPick.find((c) => c.id === cardInHand.id)
+          (cardInHand) => !cardsToPick.find((c) => c.id === cardInHand)
         );
 
         game.actions[opponent.id] = game.actions[opponent.id].filter(
@@ -533,10 +532,8 @@ io.on("connection", (socket) => {
             console.log(`[IGNORED] Secret Action already taken by ${player.id}`);
             return;
         }
-
-        // FIX: cardId is actually a card object
         game.hands[player.id] = game.hands[player.id].filter(
-          (cardInHand) => cardInHand.id !== pickedCard.id
+          (cardInHand) => cardInHand !== pickedCard.id
         );
 
         game.actions[player.id] = game.actions[player.id].filter(
@@ -575,9 +572,8 @@ io.on("connection", (socket) => {
             return;
         }
 
-        // FIX: cardId is actually a card object
         game.hands[player.id] = game.hands[player.id].filter(
-          (cardInHand) => !pickedCards.find((c) => c.id === cardInHand.id)
+          (cardInHand) => !pickedCards.find((c) => c.id === cardInHand)
         );
 
         game.actions[player.id] = game.actions[player.id].filter(
@@ -645,9 +641,9 @@ io.on("connection", (socket) => {
 
         const allFourCards = [...pickedCards[0], ...pickedCards[1]];
         
-        // FIX: cardId is actually a card object
+        // Comparison: card object id (c.id) vs card ID in hand (cardInHand)
         game.hands[opponent.id] = game.hands[opponent.id].filter(
-          (cardInHand) => !allFourCards.find((c) => c.id === cardInHand.id)
+          (cardInHand) => !allFourCards.find((c) => c.id === cardInHand)
         );
 
         game.actions[opponent.id] = game.actions[opponent.id].filter(
