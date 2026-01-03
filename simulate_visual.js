@@ -24,6 +24,34 @@ const puppeteer = require('puppeteer');
   const wait = (ms) => new Promise(res => setTimeout(res, ms));
   await wait(1500);
 
+  console.log('--- HANDLING LOBBY ---');
+
+  // Player 1 Creates Room
+  console.log('P1: Creating Room...');
+  const createBtn = await page1.$('.create-section button');
+  if (createBtn) {
+      await createBtn.click();
+      console.log('P1 clicked Create');
+  } else {
+      console.error('Create button not found!');
+  }
+  
+  await wait(1000); // Wait for room to appear in list
+
+  // Player 2 Joins Room
+  console.log('P2: Joining Room...');
+  // Find the first available room in the list and click "Join"
+  // Selector fixed: .room-card .btn-join
+  const joinBtn = await page2.$('.room-card .btn-join');
+  if (joinBtn) {
+      await joinBtn.click();
+      console.log('P2 clicked Join');
+  } else {
+      console.error('Join button not found! (Is the room list empty? Selector: .room-card .btn-join)');
+  }
+
+  await wait(2000); // Wait for game to initialize
+
   // --- Helper Functions ---
 
   async function clickAction(page, actionIndex) {

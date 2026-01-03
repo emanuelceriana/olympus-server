@@ -457,6 +457,15 @@ io.on("connection", (socket) => {
 
     const handleGiftAction = (player) => {
       player.on("trigger-gift-action", ({ pickedCards }) => {
+        const game = gameStates.get(player.id);
+        if (!game) return;
+        
+        // IDEMPOTENCY CHECK: Ensure action 3 is still available
+        if (!game.actions[player.id].includes(3)) {
+            console.log(`[IGNORED] Gift Action already taken by ${player.id}`);
+            return;
+        }
+
         const opponent = findOpponent(player);
         opponent.emit("resolve-gift-action", {
           pickedCards,
@@ -519,8 +528,15 @@ io.on("connection", (socket) => {
         const game = gameStates.get(player.id);
         if (!game) return;
 
+        // IDEMPOTENCY CHECK: Ensure action 1 is still available
+        if (!game.actions[player.id].includes(1)) {
+            console.log(`[IGNORED] Secret Action already taken by ${player.id}`);
+            return;
+        }
+
+        // FIX: cardId is actually a card object
         game.hands[player.id] = game.hands[player.id].filter(
-          (cardId) => cardId !== pickedCard.id
+          (cardInHand) => cardInHand.id !== pickedCard.id
         );
 
         game.actions[player.id] = game.actions[player.id].filter(
@@ -553,8 +569,15 @@ io.on("connection", (socket) => {
         const game = gameStates.get(player.id);
         if (!game) return;
 
+        // IDEMPOTENCY CHECK: Ensure action 2 is still available
+        if (!game.actions[player.id].includes(2)) {
+            console.log(`[IGNORED] Discard Action already taken by ${player.id}`);
+            return;
+        }
+
+        // FIX: cardId is actually a card object
         game.hands[player.id] = game.hands[player.id].filter(
-          (cardId) => !pickedCards.find((c) => c.id === cardId)
+          (cardInHand) => !pickedCards.find((c) => c.id === cardInHand.id)
         );
 
         game.actions[player.id] = game.actions[player.id].filter(
@@ -594,6 +617,15 @@ io.on("connection", (socket) => {
 
     const handleCompetitionAction = (player) => {
       player.on("trigger-competition-action", ({ pickedCards }) => {
+        const game = gameStates.get(player.id);
+        if (!game) return;
+
+        // IDEMPOTENCY CHECK: Ensure action 4 is still available
+        if (!game.actions[player.id].includes(4)) {
+            console.log(`[IGNORED] Competition Action already taken by ${player.id}`);
+            return;
+        }
+
         const opponent = findOpponent(player);
         opponent.emit("resolve-competition-action", {
           pickedCards,
